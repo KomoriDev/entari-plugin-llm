@@ -4,7 +4,16 @@ from collections import deque
 from typing import Annotated, Any, TypeAlias, get_args
 
 import openai
-from arclet.entari import BasicConfModel, MessageCreatedEvent, Session, declare_static, metadata, plugin_config, filter_
+from arclet.entari import (
+    BasicConfModel,
+    Entari,
+    MessageCreatedEvent,
+    Session,
+    declare_static,
+    filter_,
+    metadata,
+    plugin_config,
+)
 from arclet.entari.config import config_model_validate
 from arclet.entari.event.config import ConfigReload
 from arclet.entari.event.send import SendResponse
@@ -29,6 +38,8 @@ class Config(BasicConfModel):
     """Model to use for the OpenAI API"""
     prompt: str = ""
     """Default prompt template"""
+    context_length: int = 50
+    """Number of messages to keep in context"""
 
 
 metadata(
@@ -136,19 +147,37 @@ async def _record(event: SendResponse):
         RECORD.append(event.session.event.sn)
 
 
+@on(MessageCreatedEvent, priority=3)
+async def record_message(session: Session, app: Entari):
+    key = f"llm_message_record:{session.account.platform}_{session.channel.id}"
+    if await app.cache.has(key):
+        messages: deque[dict] = await app.cache.get(key)
+    else:
+        messages = deque(maxlen=_conf.context_length)
+        await app.cache.set(key, messages, None)
+    msg = session.content
+    messages.append(
+        {
+            "role": "user",
+            "content": f"[{session.user.name}@{session.user.id}] {msg}",
+            "name": f"{session.user.name}@{session.user.id}",
+        }
+    )
+
+
 @on(MessageCreatedEvent, priority=1000).if_(filter_.to_me)
-async def run_conversation(session: Session, ctx: Contexts):
+async def run_conversation(session: Session, ctx: Contexts, app: Entari):
     if session.event.sn in RECORD:
         return BLOCK
-    msg = session.elements.extract_plain_text()
-    messages: list = [{"role": "user", "content": msg, "name": session.user.name}]
+    key = f"llm_message_record:{session.account.platform}_{session.channel.id}"
+    messages: deque = await app.cache.get(key)
     if _conf.prompt:
         messages.insert(0, {"role": "system", "content": _conf.prompt})
     final_answer = ""
     for step in range(8):
         response = await client.chat.completions.create(
             model=_conf.model,
-            messages=messages,
+            messages=list(messages),
             tools=tools if tools else omit,
             tool_choice="auto",
         )
@@ -191,11 +220,14 @@ async def run_conversation(session: Session, ctx: Contexts):
                 )
             continue
         final_answer = response_message.content or ""
+        if tool_calls:
+            messages.append({"role": "assistant", "content": final_answer})
         break
     if final_answer:
         await session.send(final_answer)
     else:
         await session.send("对话失败，请稍后再试")
+    messages.popleft()
     return BLOCK
 
 
@@ -210,5 +242,6 @@ async def reload_config(event: ConfigReload):
     new_conf = config_model_validate(Config, event.value)
     _conf.model = new_conf.model
     _conf.prompt = new_conf.prompt
+    _conf.context_length = new_conf.context_length
     await client.close()
     client = openai.AsyncClient(api_key=new_conf.api_key, base_url=new_conf.base_url)
