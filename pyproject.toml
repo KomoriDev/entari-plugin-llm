@@ -6,13 +6,24 @@ authors = [
     {"name" = "RF-Tar-Railt", "email" = "rf_tar_railt@qq.com"},
 ]
 dependencies = [
-    "arclet.entari[yaml,cron,reload,dotenv] >= 0.16.8",
+    "arclet.entari[yaml,cron,reload,dotenv]>=0.17.0rc3",
     "openai>=2.14.0",
     "docstring-parser>=0.17.0",
+    "litellm>=1.80.9",
 ]
 requires-python = ">=3.10"
 readme = "README.md"
 license = {"text" = "MIT"}
+
+[dependency-groups]
+dev = [
+    "entari-plugin-server>=0.5.1",
+    "satori-python-adapter-onebot11>=0.2.7",
+    "ruff>=0.14.10",
+]
+google = [
+    "litellm[google]>=1.81.13",
+]
 
 [tool.ruff]
 line-length = 120
@@ -30,12 +41,6 @@ typeCheckingMode = "basic"
 
 [tool.pdm]
 distribution = true
-[dependency-groups]
-dev = [
-    "entari-plugin-server>=0.5.1",
-    "satori-python-adapter-onebot11>=0.2.7",
-    "ruff>=0.14.10",
-]
 
 [build-system]
 requires = ["pdm-backend"]
