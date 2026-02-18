@@ -7,6 +7,7 @@ from launart import Launart, Service
 from launart.status import Phase
 
 from ._types import Message
+from .callback import TokenUsageHandler
 from .config import get_model_config
 from .log import log
 
@@ -19,6 +20,7 @@ class LLMService(Service):
         self.total_tokens = 0
         self.total_calls = 0
         self.start_time = 0
+        self.usage_handler = TokenUsageHandler(self)
 
     @property
     def required(self) -> set[str]:
@@ -50,18 +52,6 @@ class LLMService(Service):
             **conf.extra,
             **kwargs,
         }
-
-    def _update_usage(self, response: litellm.ModelResponse | litellm.ModelResponseStream):
-        usage: litellm.Usage | None = response.get("usage", None)
-        if usage:
-            self.total_tokens += usage.total_tokens
-
-    async def _stream_wrapper(self, stream_resp: litellm.CustomStreamWrapper):
-        async for chunk in stream_resp:
-            usage = chunk.get("usage", None)
-            if usage:
-                self._update_usage(chunk)
-            yield chunk
 
     @overload
     async def generate(
@@ -121,17 +111,12 @@ class LLMService(Service):
 
         response = await litellm.acompletion(**payload)
 
-        self.total_calls += 1
-
-        if not stream:
-            self._update_usage(response) # type: ignore
-            return response
-        else:
-            return self._stream_wrapper(response) # type: ignore
+        return response
 
     async def launch(self, manager: Launart):
         async with self.stage("preparing"):
             litellm.drop_params = True
+            litellm.callbacks = [self.usage_handler]
             self.start_time = time.time()
 
         async with self.stage("blocking"):
