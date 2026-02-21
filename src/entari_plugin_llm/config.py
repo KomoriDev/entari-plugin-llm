@@ -3,6 +3,9 @@ from typing import Any
 from arclet.entari import BasicConfModel, plugin_config
 from arclet.entari.config import model_field
 
+from ._jsondata import get_default_model
+from .exception import ModelNotFoundError
+
 
 class ScopedModel(BasicConfModel):
     name: str
@@ -36,14 +39,22 @@ _conf = plugin_config(Config)
 def get_model_config(model_name: str | None = None) -> ScopedModel:
     if model_name is None:
         if not _conf.models:
-            raise ValueError("No models configured.")
-        model_name = _conf.models[0].name
+            raise ModelNotFoundError("No models configured.")
+
+        model_name = get_default_model()
 
     for model in _conf.models:
         if model.name == model_name or model.alias == model_name:
             if model.api_key is None:
                 model.api_key = _conf.api_key
-            if model.base_url == "https://api.openai.com/v1" and _conf.base_url != "https://api.openai.com/v1":
+            if (
+                model.base_url == "https://api.openai.com/v1"
+                and _conf.base_url != "https://api.openai.com/v1"
+            ):
                 model.base_url = _conf.base_url
             return model
-    raise ValueError(f"Model {model_name} not found in config.")
+    raise ModelNotFoundError(f"Model {model_name} not found in config.")
+
+
+def get_model_list() -> set[str]:
+    return {m.name for m in _conf.models} | {m.alias for m in _conf.models if m.alias}

@@ -7,6 +7,7 @@ basic:
     ignores:
       - httpx._client
       - httpcore._trace
+      - aiosqlite.core
   prefix:
     - /
   schema: true
@@ -18,12 +19,11 @@ plugins:
   .record_message:
     record_send: true
   ::echo: {}
-  ::help: {}
   ::inspect: {}
   ::auto_reload:
     watch_config: true
   entari_plugin_llm:
-    api_key: ${{ env.LLM_API_KEY }}
+    api_key: ${{ env.OPENAI_API_KEY }}
     base_url: https://api.openai.com/v1
     models:
       - name: "deepseek/deepseek-chat"
@@ -33,6 +33,7 @@ plugins:
         api_key: ${{ env.GEMINI_API_KEY }}
         base_url: https://generativelanguage.googleapis.com
       - name: "gpt-4.1-mini"
+        alias: "gpt"
 
     prompt: |
       你是一个由用户提供信息并回答问题的智能助手。请根据用户提供的信息，尽可能准确和简洁地回答他们的问题。如果信息不足以回答问题，请礼貌地告知用户需要更多信息。

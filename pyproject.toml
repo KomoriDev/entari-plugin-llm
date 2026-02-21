@@ -10,6 +10,7 @@ dependencies = [
     "openai>=2.14.0",
     "docstring-parser>=0.17.0",
     "litellm>=1.80.9",
+    "entari-plugin-database>=0.2.3",
 ]
 requires-python = ">=3.10"
 readme = "README.md"

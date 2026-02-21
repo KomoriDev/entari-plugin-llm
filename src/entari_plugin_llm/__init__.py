@@ -1,4 +1,4 @@
-from arclet.entari import declare_static, metadata
+﻿from arclet.entari import declare_static, metadata
 
 from .config import Config
 from .events import LLMToolEvent as LLMToolEvent
@@ -15,4 +15,10 @@ declare_static()
 _suppress_litellm_logging()
 
 from . import listeners as listeners
+from . import matchers as matchers
 from .service import llm as llm
+
+__all__ = [
+    "llm",
+    "LLMToolEvent",
+]
